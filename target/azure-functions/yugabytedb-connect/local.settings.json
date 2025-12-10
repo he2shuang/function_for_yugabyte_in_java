@@ -1,0 +1,12 @@
+{
+  "IsEncrypted": false,
+  "Values": {
+    "AzureWebJobsStorage": "UseDevelopmentStorage=true",
+    "FUNCTIONS_WORKER_RUNTIME": "java",
+    
+    "DB_URL": "jdbc:yugabytedb://localhost:5433/event_db",
+    "DB_USER": "yugabyte",
+    "DB_PASSWORD": "yugabyte"
+
+  }
+}
