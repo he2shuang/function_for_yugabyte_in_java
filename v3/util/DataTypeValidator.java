@@ -292,13 +292,25 @@ public class DataTypeValidator {
      */
     private static void validateJsonType(String columnName, String typeName, 
                                         JsonElement jsonValue, String tableName) {
-        // JSON型は任意の有効なJSON値を受け入れる
-        // Gsonがすでに有効なJSONであることを保証しているため、追加の検証は不要
-        if (jsonValue.isJsonNull() || jsonValue.isJsonObject() || 
-            jsonValue.isJsonArray() || jsonValue.isJsonPrimitive()) {
+        // JSON型只接受JSON对象或JSON数组
+        if (jsonValue.isJsonObject() || jsonValue.isJsonArray()) {
             return;
         }
         
+            // 如果是原始值，检查是否是有效的JSON字符串
+            if (jsonValue.isJsonPrimitive() && jsonValue.getAsJsonPrimitive().isString()) {
+                String strValue = jsonValue.getAsString();
+                try {
+                    // 尝试解析字符串是否为有效JSON
+                    JsonParser.parseString(strValue);
+                    return; // 如果是有效的JSON字符串，允许
+                } catch (Exception e) {
+                    // 不是有效的JSON字符串
+                    throw ValidationException.invalidDataType(columnName, typeName, tableName);
+                }
+            }
+        
+        // 不接受null、数字、布尔值等原始类型
         throw ValidationException.invalidDataType(columnName, typeName, tableName);
     }
     
@@ -344,3 +356,4 @@ public class DataTypeValidator {
         return JSON_TYPES.contains(typeName.toLowerCase());
     }
 }
+
