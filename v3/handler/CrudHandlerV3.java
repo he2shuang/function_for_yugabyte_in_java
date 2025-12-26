@@ -166,7 +166,16 @@ public class CrudHandlerV3 {
         Map<String, ColumnMetadata> tableColumns = DatabaseMetadataServiceV3.getTableColumns(conn, table, context);
         String primaryKeyColumn = DatabaseMetadataServiceV3.getPrimaryKeyColumnName(conn, table, context);
         
-        JsonObject body = gson.fromJson(jsonBody, JsonObject.class);
+        JsonObject body;
+        try {
+            body = gson.fromJson(jsonBody, JsonObject.class);
+        } catch (com.google.gson.JsonSyntaxException e) {
+            throw new ValidationException(
+                ErrorCode.INVALID_FORMAT,
+                "request_body",
+                String.format("无效的JSON格式: %s", e.getMessage())
+            );
+        }
         String timestampColumn = DatabaseMetadataServiceV3.findAutoTimestampColumn(tableColumns);
         
         // 2. リクエストボディのフィールドがすべてテーブルに存在するか検証
@@ -582,3 +591,4 @@ public class CrudHandlerV3 {
         }
     }
 }
+
