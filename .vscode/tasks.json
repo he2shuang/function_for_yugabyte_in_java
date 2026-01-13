@@ -8,7 +8,7 @@
 			"problemMatcher": "$func-java-watch",
 			"isBackground": true,
 			"options": {
-				"cwd": "${workspaceFolder}/target/azure-functions/yugabytedb-connect-1763706886471"
+				"cwd": "${workspaceFolder}/target/azure-functions/yugabytedb-connect"
 			},
 			"dependsOn": "package (functions)"
 		},

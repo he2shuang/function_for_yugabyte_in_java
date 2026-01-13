@@ -408,21 +408,6 @@ public class CrudHandler {
         }
     }
 
-    /**
-     * 返回需要自动处理时间戳的列名
-     * 注意：这里假设时间戳列的名称为 "upsert_date" 或 "updated_at"，后续需要改进。
-     * 
-     * @param tableColumns 当前表的元数据。
-     * @return 时间戳列的名称，如果不存在则返回 null。
-     */
-    // private String findAutoTimestampColumn(Map<String, ColumnMetadata> tableColumns) {
-    //     if (tableColumns.containsKey("upsert_date")) {
-    //         return "upsert_date";
-    //     } else if (tableColumns.containsKey("updated_at")) {
-    //         return "updated_at";
-    //     }
-    //     return null;
-    // }
     
     /**
      * 为 INSERT 操作处理自动时间戳。

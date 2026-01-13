@@ -1,2 +1,8 @@
 C:\limeng\Azure Function\workspace\function_for_yugabyte_in_java\src\test\java\com\yugabyte\function\FunctionTest.java
 C:\limeng\Azure Function\workspace\function_for_yugabyte_in_java\src\test\java\com\yugabyte\function\HttpResponseMessageMock.java
+C:\limeng\Azure Function\workspace\function_for_yugabyte_in_java\src\test\java\com\yugabyte\function\Test.java
+C:\limeng\Azure Function\workspace\function_for_yugabyte_in_java\src\test\java\com\yugabyte\v2\function\FunctionV2Test.java
+C:\limeng\Azure Function\workspace\function_for_yugabyte_in_java\src\test\java\com\yugabyte\v3\function\FunctionV3Test.java
+C:\limeng\Azure Function\workspace\function_for_yugabyte_in_java\src\test\java\com\yugabyte\v3\handler\CrudHandlerV3JsonTest.java
+C:\limeng\Azure Function\workspace\function_for_yugabyte_in_java\src\test\java\com\yugabyte\v3\handler\JsonValidationTest.java
+C:\limeng\Azure Function\workspace\function_for_yugabyte_in_java\src\test\java\com\yugabyte\v3\util\DataTypeValidatorTest.java

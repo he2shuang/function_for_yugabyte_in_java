@@ -4,9 +4,14 @@
     "AzureWebJobsStorage": "UseDevelopmentStorage=true",
     "FUNCTIONS_WORKER_RUNTIME": "java",
     
-    "DB_URL": "jdbc:yugabytedb://localhost:5433/event_db",
+    "DB_URL": "jdbc:yugabytedb://localhost:5433/event_db?connectTimeout=5&socketTimeout=3",
     "DB_USER": "yugabyte",
     "DB_PASSWORD": "yugabyte"
 
+  },
+  "logging": {
+    "logLevel": {
+      "Microsoft.AspNetCore.Routing": "Debug"
+    }
   }
 }

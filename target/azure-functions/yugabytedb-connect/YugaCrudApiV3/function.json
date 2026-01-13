@@ -1,0 +1,16 @@
+{
+  "scriptFile" : "../yugabytedb-connect-1.0-SNAPSHOT.jar",
+  "entryPoint" : "com.yugabyte.v3.function.FunctionV3.run",
+  "bindings" : [ {
+    "type" : "httpTrigger",
+    "direction" : "in",
+    "name" : "req",
+    "route" : "v3/{table}",
+    "methods" : [ "GET", "POST", "PATCH", "DELETE" ],
+    "authLevel" : "ANONYMOUS"
+  }, {
+    "type" : "http",
+    "direction" : "out",
+    "name" : "$return"
+  } ]
+}

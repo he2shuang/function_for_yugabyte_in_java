@@ -1,4 +1,13 @@
-com\yugabyte\function\FunctionTest$1.class
-com\yugabyte\function\FunctionTest.class
+com\yugabyte\v2\function\FunctionV2Test.class
 com\yugabyte\function\HttpResponseMessageMock$HttpResponseMessageBuilderMock.class
+com\yugabyte\v2\function\FunctionV2Test$3.class
+com\yugabyte\function\Test.class
+com\yugabyte\function\FunctionTest$1.class
 com\yugabyte\function\HttpResponseMessageMock.class
+com\yugabyte\v2\function\FunctionV2Test$1.class
+com\yugabyte\function\FunctionTest.class
+com\yugabyte\v3\handler\CrudHandlerV3JsonTest.class
+com\yugabyte\v3\util\DataTypeValidatorTest.class
+com\yugabyte\v3\handler\JsonValidationTest.class
+com\yugabyte\v3\function\FunctionV3Test.class
+com\yugabyte\v2\function\FunctionV2Test$2.class
