@@ -1,3 +1,192 @@
 1. Function层 (最外层入口) - 只做最基础的HTTP适配。具体内容委托给Handler，保持Function简洁
 2. Handler层 (协调层) - 协调整个处理流程。验证请求有效性，根据操作类型路由， 统一异常处理。解析请求体；调用业务服务；构建HTTP响应。
 3. Service层 (业务逻辑层) - 纯粹的业务逻辑。业务规则验证，业务逻辑等。
+
+
+package com.yugabyte.v3.repository;
+
+import com.yugabyte.v3.service.DatabaseMetadataServiceV3.ColumnMetadata;
+
+import java.sql.Connection;
+import java.sql.DatabaseMetaData;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.util.HashMap;
+import java.util.Map;
+
+public class DatabaseMetadataRepositoryV3 {
+
+    public Map<String, ColumnMetadata> loadTableColumns(Connection conn, String schema, String table) throws SQLException {
+        Map<String, ColumnMetadata> columnMap = new HashMap<>();
+        DatabaseMetaData metaData = conn.getMetaData();
+
+        try (ResultSet rs = metaData.getColumns(null, schema, table, null)) {
+            while (rs.next()) {
+                String columnName = rs.getString("COLUMN_NAME");
+                String typeName = rs.getString("TYPE_NAME");
+                boolean isNullable = "YES".equalsIgnoreCase(rs.getString("IS_NULLABLE"));
+                columnMap.put(columnName, new ColumnMetadata(typeName, isNullable));
+            }
+        }
+        return columnMap;
+    }
+
+    public String loadPrimaryKeyColumnName(Connection conn, String schema, String table) throws SQLException {
+        DatabaseMetaData metaData = conn.getMetaData();
+        try (ResultSet rs = metaData.getPrimaryKeys(null, schema, table)) {
+            if (rs.next()) {
+                return rs.getString("COLUMN_NAME");
+            }
+        }
+        return null;
+    }
+}
+
+package com.yugabyte.v3.service;
+
+import com.github.benmanes.caffeine.cache.Cache;
+import com.github.ben-manes.caffeine.cache.Caffeine;
+import com.microsoft.azure.functions.ExecutionContext;
+import com.yugabyte.v3.exception.DatabaseException;
+import com.yugabyte.v3.repository.DatabaseMetadataRepositoryV3;
+
+import java.sql.Connection;
+import java.sql.SQLException;
+import java.time.Duration;
+import java.util.*;
+import java.util.concurrent.TimeUnit;
+
+public class DatabaseMetadataServiceV3 {
+
+    private static final DatabaseMetadataRepositoryV3 repo = new DatabaseMetadataRepositoryV3();
+
+    // Caffeine caches
+    private static final Cache<String, Map<String, ColumnMetadata>> tableMetadataCache =
+            Caffeine.newBuilder()
+                    .maximumSize(Long.parseLong(System.getenv().getOrDefault("META_CACHE_MAX", "200")))
+                    .expireAfterWrite(Long.parseLong(System.getenv().getOrDefault("META_CACHE_TTL_MIN", "360")), TimeUnit.MINUTES)
+                    .build();
+
+    private static final Cache<String, Optional<String>> primaryKeyCache =
+            Caffeine.newBuilder()
+                    .maximumSize(Long.parseLong(System.getenv().getOrDefault("META_CACHE_MAX", "200")))
+                    .expireAfterWrite(Long.parseLong(System.getenv().getOrDefault("META_CACHE_TTL_MIN", "360")), TimeUnit.MINUTES)
+                    .build();
+
+    private static final Set<String> TIMESTAMP_TYPE_NAMES = new HashSet<>(Arrays.asList(
+            "timestamp",
+            "timestamptz",
+            "datetime",
+            "timestamp without time zone",
+            "timestamp with time zone"
+    ));
+
+    public record ColumnMetadata(String typeName, boolean isNullable) {}
+
+    public static boolean tableExists(Connection conn, String tableName, ExecutionContext context) {
+        try {
+            return !getTableColumns(conn, tableName, context).isEmpty();
+        } catch (DatabaseException e) {
+            context.getLogger().warning("テーブル存在確認中に例外が発生しました: " + e.getMessage());
+            return false;
+        }
+    }
+
+    public static String getPrimaryKeyColumnName(Connection conn, String tableName, ExecutionContext context) {
+        String key = normalizeKey(tableName);
+
+        Optional<String> cached = primaryKeyCache.getIfPresent(key);
+        if (cached != null) {
+            return cached.orElse(null);
+        }
+
+        context.getLogger().info("メタデータキャッシュミス: テーブル '" + tableName + "' の主キーをクエリ中。");
+
+        String[] st = splitSchemaTable(tableName); // [schema, table]
+        try {
+            String pk = repo.loadPrimaryKeyColumnName(conn, st[0], st[1]);
+            primaryKeyCache.put(key, Optional.ofNullable(pk));  // ✅ 可以缓存“无主键”
+            return pk;
+        } catch (SQLException e) {
+            context.getLogger().severe("主キー列名の取得中にエラーが発生しました: " + e.getMessage());
+            throw DatabaseException.queryFailed("getPrimaryKeys", e.getMessage(), e);
+        }
+    }
+
+    public static Map<String, ColumnMetadata> getTableColumns(Connection conn, String tableName, ExecutionContext context) {
+        String key = normalizeKey(tableName);
+
+        Map<String, ColumnMetadata> cached = tableMetadataCache.getIfPresent(key);
+        if (cached != null) {
+            return cached;
+        }
+
+        context.getLogger().info("メタデータキャッシュミス: テーブル '" + tableName + "' の列をクエリ中。");
+
+        String[] st = splitSchemaTable(tableName); // [schema, table]
+        try {
+            Map<String, ColumnMetadata> columnMap = repo.loadTableColumns(conn, st[0], st[1]);
+
+            if (columnMap.isEmpty()) {
+                // 表不存在：沿用你原来的语义
+                throw DatabaseException.tableNotFound(tableName);
+            }
+
+            tableMetadataCache.put(key, columnMap);
+            return columnMap;
+
+        } catch (SQLException e) {
+            context.getLogger().severe("テーブル列情報の取得中にエラーが発生しました: " + e.getMessage());
+            throw DatabaseException.queryFailed("getColumns", e.getMessage(), e);
+        }
+    }
+
+    public static String findAutoTimestampColumn(Map<String, ColumnMetadata> tableColumns) {
+        for (Map.Entry<String, ColumnMetadata> entry : tableColumns.entrySet()) {
+            ColumnMetadata metadata = entry.getValue();
+            if (isTimestampType(metadata)) {
+                return entry.getKey();
+            }
+        }
+        return null;
+    }
+
+    private static boolean isTimestampType(ColumnMetadata metadata) {
+        if (metadata == null || metadata.typeName() == null) return false;
+        String typeNameInLower = metadata.typeName().toLowerCase(Locale.ROOT);
+        return TIMESTAMP_TYPE_NAMES.contains(typeNameInLower);
+    }
+
+    public static void clearCache() {
+        tableMetadataCache.invalidateAll();
+        primaryKeyCache.invalidateAll();
+    }
+
+    public static void clearCacheForTable(String tableName) {
+        String key = normalizeKey(tableName);
+        tableMetadataCache.invalidate(key);
+        primaryKeyCache.invalidate(key);
+    }
+
+    // -------- helpers --------
+
+    private static String normalizeKey(String tableName) {
+        return tableName == null ? "" : tableName.trim().toLowerCase(Locale.ROOT);
+    }
+
+    /**
+     * 支持 "table" 或 "schema.table"
+     * - 如果没有 schema：沿用你原先行为（schema = null）
+     * - 如果你希望默认 public，把 null 换成 "public"
+     */
+    private static String[] splitSchemaTable(String tableName) {
+        if (tableName == null) throw new IllegalArgumentException("tableName is null");
+        String s = tableName.trim();
+        int dot = s.indexOf('.');
+        if (dot > 0 && dot < s.length() - 1) {
+            return new String[]{ s.substring(0, dot), s.substring(dot + 1) };
+        }
+        return new String[]{ null, s };
+    }
+}
+
